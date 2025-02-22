@@ -1,0 +1,337 @@
+{
+  "name": "Digital Employee",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1820,
+        -1120
+      ],
+      "id": "9cdad143-f782-4eb0-90b2-075b8de7a0b7",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "options": {
+          "delimiter": ","
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        -1340
+      ],
+      "id": "4481986d-de33-44c1-b26e-15eca85bc0af",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.csv_file }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -1240,
+        -1340
+      ],
+      "id": "3da9fa35-1f51-4494-92fe-8d4bb90abcbb",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import json\n\ndata = _input.all()\n\nsummary = data[:5]\n\nreturn [{\"summary\": summary}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -1340
+      ],
+      "id": "f88633d6-6cac-41ec-b0e3-76fcfadbe841",
+      "name": "Create Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI assistant helping design dashboards for a data visualization tool (vizro-ai). \nBased on this information, propose an interesting dashboard layout with multiple pages, each describing a specific visualization. Use this format for each page, inspired by the example below (this is just an example and doesn't relate to our data)\n\nExample to return\n\"I need a page showing 1 card and 1 chart.\nThe card says 'The Gapminder dataset provides historical data on countries' development indicators.'\nThe chart is a scatter plot showing GDP per capita vs. life expectancy.\nGDP per capita on the x-axis, life expectancy on the y-axis, and colored by continent.\nLayout the card on the left and the chart on the right. The card takes 1/3 of the whole space on the left.\nThe chart takes 2/3 of the whole space and is on the right.\nAdd a filter to filter the scatter plot by continent.\nAdd a second filter to filter the chart by year.\"\"\n\nEnsure the dashboard uses the data fields from the CSV (e.g., 'name', 'age', 'city') creatively to create insightful visualizations. Propose 1 page total, each with unique and engaging layouts. Return only the dashboard specification in the format above, with no explanation or additional text. You can use the cards to write static data / headers etc\n\nOnly return a single result item to specify a single dashboard page\n\nWhat follows is the CSV with example summary data:\n{{ $json.summary }}\nThe user has provided this high-level description of the data:\n{{ $json.description }}\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -140,
+        -1140
+      ],
+      "id": "f9607fd7-23bd-4deb-907a-4f5418a6dccf",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        -1140
+      ],
+      "id": "e72c8e51-889d-4dc5-8f04-0bc98d771bff",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -140,
+        -900
+      ],
+      "id": "1ab1468f-9c8d-452f-974d-22d4f16162cc",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "fmGzeb5BmTeUABVO",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d0138de0-f7c1-4bb7-b55c-5a37009ecd56",
+              "name": "summary",
+              "value": "={{ $json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "edd3b20b-515a-41f0-925e-b71f5ab71311",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -700,
+        -1340
+      ],
+      "id": "386cacba-8f28-4dd0-8375-149dafe70235",
+      "name": "Summary to string"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "02a7eb99-7c9a-461d-964e-2bfc3808c3c7",
+              "name": "csv_file",
+              "value": "E:/dev/dgn8n/footballl/sales-data-sample.csv",
+              "type": "string"
+            },
+            {
+              "id": "426e6cef-ec37-42b6-b7c1-75f67b9301b7",
+              "name": "description",
+              "value": "This file contains sales data for different regional offices. I want a focus on area and geographic maps.",
+              "type": "string"
+            },
+            {
+              "id": "54504199-570a-42ee-9da8-e33c309ef92a",
+              "name": "dashboard_id",
+              "value": "Sales dashboard",
+              "type": "string"
+            },
+            {
+              "id": "b481fcd2-14c5-4d80-a69e-0e0339bf28c9",
+              "name": "user_id",
+              "value": "Alex",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1560,
+        -1120
+      ],
+      "id": "8f7d1744-9414-4142-964c-dbf002209b15",
+      "name": "Set Analysis Info"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/create_dashboard",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "user_id",
+              "value": "={{ $('Merge').item.json.user_id }}"
+            },
+            {
+              "name": "dashboard_id",
+              "value": "={{ $('Merge').item.json.dashboard_id }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "csv_path",
+              "value": "={{ $('Merge').item.json.csv_file }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        -1020
+      ],
+      "id": "41539066-cdab-438c-b767-22a19621693f",
+      "name": "Create Dashboard"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Analysis Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Summary": {
+      "main": [
+        [
+          {
+            "node": "Summary to string",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Create Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary to string": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Analysis Info": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8c13de63-db60-48fb-b3cf-f0161b8f9a9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "80077bb12b5d1748bc0525fae8c667920da0fb0c0fb2924400e1e8097b556fba"
+  },
+  "id": "zlWC36NLpONCxhls",
+  "tags": []
+}
