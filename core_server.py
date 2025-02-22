@@ -12,13 +12,12 @@ client = docker.from_env()
 ###############################################################################
 # Directory paths inside the core server container
 ###############################################################################
-CONTAINER_CONFIGS_DIR = "/app/configs"  # The container sees your host's configs here
+CONTAINER_CONFIGS_DIR = "/app/configs"  # Where config files are written inside the container
 CONTAINER_ENV_DIR = "/app/env"
 
 ###############################################################################
-# Actual host paths (so Docker can find them)
+# Actual host paths (set via environment variables in docker-compose.yml)
 ###############################################################################
-# These are passed in via environment variables in docker-compose.yml
 HOST_CONFIGS_DIR = os.environ.get("HOST_CONFIGS_DIR", "/app/configs")
 HOST_ENV_DIR = os.environ.get("HOST_ENV_DIR", "/app/env")
 
@@ -46,7 +45,7 @@ def create_dashboard():
     dashboard_id = data.get("dashboard_id")
     user_id = data.get("user_id")
     description = data.get("description")
-    csv_path = data.get("csv_path")  # optional
+    csv_path = data.get("csv_path")  # Optional host CSV file path
 
     if not all([dashboard_id, user_id, description]):
         return jsonify({"error": "dashboard_id, user_id, and description are required"}), 400
@@ -63,7 +62,8 @@ def create_dashboard():
             app.logger.error(f"Error stopping existing container: {e}")
 
     try:
-        # Build the config dictionary
+        # Build the config dictionary.
+        # Start with the original csv_path value; we'll update it if provided.
         config = {
             "dashboard_id": dashboard_id,
             "user_id": user_id,
@@ -71,30 +71,41 @@ def create_dashboard():
             "csv_path": csv_path
         }
 
-        # Generate a filename like "john_smith_my_dashboard.json"
-        config_filename = f"{dashboard_key.replace(':', '_')}.json"
+        #######################################################################
+        # If a CSV file is provided, update the config to use a container path
+        # and prepare a volume mapping for it.
+        #######################################################################
+        csv_volume = {}
+        if csv_path:
+            # Assume csv_path is an absolute host path.
+            csv_filename = os.path.basename(csv_path)
+            # We'll mount the CSV file into the dashboard container at /data/csvs/<filename>
+            container_csv_path = f"/data/csvs/{csv_filename}"
+            config["csv_path"] = container_csv_path  # Update config to use container path
+            csv_volume[csv_path] = {"bind": container_csv_path, "mode": "ro"}
 
         #######################################################################
-        # 1. Write the config INSIDE this container at /app/configs
+        # Write the config file inside the container (in /app/configs)
         #######################################################################
+        config_filename = f"{dashboard_key.replace(':', '_')}.json"
         container_config_path = os.path.join(CONTAINER_CONFIGS_DIR, config_filename)
         if os.path.exists(container_config_path) and os.path.isdir(container_config_path):
             shutil.rmtree(container_config_path)
-
         with open(container_config_path, "w", encoding="utf-8") as f:
             json.dump(config, f)
-
         if not os.path.isfile(container_config_path):
             raise Exception(f"Failed to create config file: {container_config_path}")
 
         #######################################################################
-        # 2. Determine the REAL HOST path so Docker can mount the file
+        # Determine the real host path for the config file.
         #######################################################################
         host_config_path = os.path.join(HOST_CONFIGS_DIR, config_filename)
         if os.path.exists(host_config_path) and os.path.isdir(host_config_path):
             shutil.rmtree(host_config_path)
 
-        # Prepare extra.env (for your API keys, etc.)
+        #######################################################################
+        # Prepare the extra.env file (for API keys, etc.)
+        #######################################################################
         container_env_path = os.path.join(CONTAINER_ENV_DIR, "extra.env")
         host_env_path = os.path.join(HOST_ENV_DIR, "extra.env")
         if not os.path.exists(container_env_path):
@@ -107,19 +118,24 @@ def create_dashboard():
         app.logger.info(f"Host config path: {host_config_path}")
 
         #######################################################################
-        # 3. Spawn the dashboard container, using the HOST path for volumes
+        # Spawn the dashboard container.
+        # Build the volumes mapping: always mount config and env files.
+        # If a CSV file is provided, add its mapping as well.
         #######################################################################
+        volumes = {
+            host_config_path: {"bind": "/config/dashboard_config.json", "mode": "ro"},
+            os.path.join(HOST_ENV_DIR, "extra.env"): {"bind": "/config/extra.env", "mode": "ro"}
+        }
+        if csv_volume:
+            volumes.update(csv_volume)
+
         container = client.containers.run(
-            "vizro-dashboard",  # Make sure this image is built/pulled
+            "vizro-dashboard",  # Ensure this image is available
             detach=True,
             ports={"8050/tcp": port},
-            volumes={
-                host_config_path: {"bind": "/config/dashboard_config.json", "mode": "ro"},
-                os.path.join(HOST_ENV_DIR, "extra.env"): {"bind": "/config/extra.env", "mode": "ro"}
-            }
+            volumes=volumes
         )
 
-        # Record the container info
         dashboard_containers[dashboard_key] = {
             "port": port,
             "container": container,
@@ -193,5 +209,4 @@ def index():
     return jsonify({"running_dashboards": all_dashboards}), 200
 
 if __name__ == "__main__":
-    # For production, you may want to bind to 0.0.0.0 and run behind a reverse proxy.
     app.run(debug=False, host="0.0.0.0", port=8000)

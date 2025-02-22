@@ -1,0 +1,7 @@
+vizro
+vizro-ai
+dash
+flask
+pandas
+python-dotenv
+docker
