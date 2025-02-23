@@ -53,6 +53,10 @@ def modify_docker_compose_yaml(script_dir):
 def create_env_file(env_dir):
     """Creates the .env file and prompts user for OpenAI API key."""
     env_file_path = os.path.join(env_dir, "extra.env")
+
+    if not os.path.exists(env_dir):
+        os.mkdir(env_dir)
+
     if not os.path.exists(env_file_path):
         print("\nCreating 'extra.env' file in '{}' directory...".format(env_dir))
         try:
