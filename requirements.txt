@@ -5,5 +5,4 @@ flask
 pandas
 python-dotenv
 docker
-yaml
 pyyaml
